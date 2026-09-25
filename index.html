@@ -59,9 +59,14 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 .tile .lab{font-size:13px;color:var(--dim);margin-top:9px;font-weight:400}
 .tile .ttl{font-size:16px;font-weight:600;line-height:1.3;margin-top:2px;letter-spacing:-.2px;
  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.done{position:absolute;right:8px;top:8px;width:26px;height:26px;border-radius:50%;
- background:var(--ok);display:grid;place-items:center;box-shadow:0 1px 5px rgba(0,0,0,.28)}
-.done svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.tile .ph a{display:block;width:100%;height:100%}
+.rchk{position:absolute;right:7px;top:7px;width:29px;height:29px;border-radius:8px;
+ display:grid;place-items:center;background:rgba(255,255,255,.85);backdrop-filter:blur(6px);
+ box-shadow:0 1px 4px rgba(0,0,0,.2);z-index:3}
+.rchk svg{width:16px;height:16px;stroke:var(--dim2);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.rchk.on{background:var(--ok);box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.rchk.on svg{stroke:#fff}
+:root[data-theme="dark"] .rchk{background:rgba(44,44,46,.85)}
 
 /* chapter page */
 .chead{padding:22px 0 4px}
@@ -266,16 +271,33 @@ function cell(f){
   </div>`;
 }
 
+function tileHTML(c){
+  const im=c.cover?`<img loading="lazy" src="coverthumb/${c.cover}" alt="">`
+    :c.imgs.length?`<img loading="lazy" src="thumb/${c.imgs[0]}" alt="">`
+    :`<div class="noimg"><span>${c.n===0?'—':c.n}</span></div>`;
+  const on=readSet.has(c.slug);
+  const cap=c.cover?'':`<div class="lab">${c.label}</div><div class="ttl">${c.short||c.title}</div>`;
+  return `<div class="tile"><div class="ph">
+      <a href="#ch/${c.slug}" aria-label="${c.label} — ${c.short||c.title}">${im}</a>
+      <button class="rchk${on?' on':''}" data-toggleread="${c.slug}"
+        aria-label="${on?'Mark as unread':'Mark as read'}"><svg viewBox="0 0 24 24">${CHECK}</svg></button>
+    </div>${cap}</div>`;
+}
+function bindReadChecks(after){
+  app.querySelectorAll('[data-toggleread]').forEach(b=>b.onclick=e=>{
+    e.preventDefault(); e.stopPropagation();
+    const s=b.dataset.toggleread;
+    readSet.has(s)?readSet.delete(s):readSet.add(s); saveR();
+    const y=window.scrollY; after(); window.scrollTo(0,y);
+  });
+}
 function chapters(){
   $('#back').hidden=true; $('#seg').hidden=false; setSeg('chapters');
-  app.innerHTML='<div class="grid">'+BOOK.map(c=>{
-    const im=c.cover?`<img loading="lazy" src="coverthumb/${c.cover}" alt="">`
-      :c.imgs.length?`<img loading="lazy" src="thumb/${c.imgs[0]}" alt="">`
-      :`<div class="noimg"><span>${c.n===0?'—':c.n}</span></div>`;
-    const dn=readSet.has(c.slug)?`<div class="done"><svg viewBox="0 0 24 24">${CHECK}</svg></div>`:'';
-    const cap=c.cover?'':`<div class="lab">${c.label}</div><div class="ttl">${c.short||c.title}</div>`;
-    return `<a class="tile" href="#ch/${c.slug}" aria-label="${c.label} — ${c.short||c.title}"><div class="ph">${im}${dn}</div>${cap}</a>`;
-  }).join('')+'</div>';
+  const list=BOOK.filter(c=>!readSet.has(c.slug));
+  app.innerHTML = list.length
+    ? '<div class="grid">'+list.map(tileHTML).join('')+'</div>'
+    : '<div class="empty">Every chapter is marked read.<br>Open the Read tab to revisit or uncheck one.</div>';
+  bindReadChecks(chapters);
   stickWatch();
 }
 
@@ -462,14 +484,9 @@ function readTab(){
   app.innerHTML=`<div class="prog"><h2>${done.length} of ${BOOK.length} read</h2>
       <div class="ptrack"><div class="pfill" style="width:${pct}%"></div></div>
       <p>${done.length===BOOK.length?'Every chapter finished.':(BOOK.length-done.length)+' to go'}</p></div>`
-    + (done.length?'<div class="grid">'+done.map(c=>{
-        const im=c.cover?`<img loading="lazy" src="coverthumb/${c.cover}" alt="">`
-          :c.imgs.length?`<img loading="lazy" src="thumb/${c.imgs[0]}" alt="">`
-          :`<div class="noimg"><span>${c.n===0?'—':c.n}</span></div>`;
-        return `<a class="tile" href="#ch/${c.slug}"><div class="ph">${im}
-          <div class="done"><svg viewBox="0 0 24 24">${CHECK}</svg></div></div></a>`;
-      }).join('')+'</div>'
-      : '<div class="empty">No chapters marked read yet.<br>Open a chapter and tap Mark as read at the bottom.</div>');
+    + (done.length?'<div class="grid">'+done.map(tileHTML).join('')+'</div>'
+      : '<div class="empty">No chapters marked read yet.<br>Tap the checkbox on any cover to move it here.</div>');
+  bindReadChecks(readTab);
   stickWatch();
 }
 
